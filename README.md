@@ -215,3 +215,120 @@ docker exec -it <mysql-container-id> mysql -p todos
 ```sh
 mysql> select * from todo_items;
 ```
+
+---
+
+## Part 8: Using Docker Compose
+
+Create a docker compose file for the app container and the mysql container
+- notice an entry for each of the configurations passed in when running the `docker run` to start up the containers
+```yaml
+version: "3.8"
+
+services:
+  app:
+    image: node:12-alpine
+    command: sh -c "yarn install && yarn run dev"
+    ports:
+      - 3000:3000
+    working_dir: /app
+    volumes:
+      - ./:/app
+    environment:
+      MYSQL_HOST: mysql
+      MYSQL_USER: root
+      MYSQL_PASSWORD: secret
+      MYSQL_DB: todos
+
+  mysql:
+    image: mysql:5.7
+    volumes:
+      - todo-mysql-data:/var/lib/mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: secret
+      MYSQL_DATABASE: todos
+
+volumes:
+  todo-mysql-data:
+
+```
+
+Start the application stack from the docker compose file
+```sh
+docker-compose up -d
+```
+
+View the logs for the docker-compose startup
+```sh
+docker-compose logs
+```
+
+TIP: Waiting for DB to start up
+- For node apps, can use `wait-port` package to wait for the DB
+
+Tear down the app with Docker compose
+```sh
+docker-compose down
+```
+
+Tear down the app and remove the volumes
+```sh
+docker-compose down --volumes
+```
+
+---
+
+## Part 9: Image Building Best Practices
+
+Use `docker scan` to scan image for vulnerabilities
+
+View the layers of an image build from commands from the Dockerfile
+```sh
+docker image history <image-name>
+```
+
+Once a layer is changed, all down stream layers will change too
+- the order of commands in the Dockerfile matters
+
+Reorder Dockerfile to copy in package.json and install dependancies before bringing in app files
+- this way making a change to app files will not reinstall dependancies
+
+```
+# syntax=docker/dockerfile:1
+FROM node:12-alpine
+WORKDIR /app
+COPY package.json yarn.lock ./
+RUN yarn install --production
+COPY . .
+CMD ["node", "src/index.js"]
+```
+
+Create `.dockerignore` file in root of app and include `node_modules
+
+Build image and test
+```sh
+docker build -t getting-started
+```
+
+Make a change to an app file
+- notice we are pulling in layers from a cache and do not need to re-install node modules
+
+#### React Example
+
+- Build static front end assets with a Node container
+- Host on nginx container
+- No need to host Node on our destination container
+
+```
+# syntax=docker/dockerfile:1
+FROM node:12 AS build
+WORKDIR /app
+COPY package* yarn.lock ./
+RUN yarn install
+COPY public ./public
+COPY src ./src
+RUN yarn run build
+
+FROM nginx:alpine
+COPY --from=build /app/build /usr/share/nginx/html
+```

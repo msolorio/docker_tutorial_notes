@@ -135,3 +135,83 @@ Keep different parts of the stack in different containers
 - database, server, and client in separate containers
 - this way each tier can scale independently
 - update versions in isolation
+
+#### Container Network
+If two containers are on the same network they can talk to each other
+
+Can add a container to a network
+- at container startup
+- or connect an existing container
+
+#### Connect containers running on the same network
+- each container has its own IP address
+
+Create a network
+```sh
+docker network create todo-app
+```
+
+Start a MySQL container and attach it to the network
+- provides a network alias to ID the container on the network
+```sh
+docker run -d \
+  --network todo-app --network-alias mysql \
+  -v todo-mysql-data:/var/lib/mysql \
+  -e MYSQL_ROOT_PASSWORD=secret \
+  -e MYSQL_DATABASE=todos \
+  mysql:5.7
+```
+
+Confirm DB is up and running
+```sh
+docker exec -it <mysql-container-id> mysql -u root -p
+```
+
+```sh
+mysql> SHOW DATABASES;
+```
+
+Create netshoot container for troubleshooting network and attach to the network
+```sh 
+docker run -it --network todo-app nicolaka/netshoot
+```
+
+Look up IP address of mysql container by passing in **network alias**
+```sh
+dig mysql
+```
+
+For mySQL 8.0 and higher
+```sh
+mysql> ALTER USER 'root' IDENTIFIED WITH mysql_native_password BY 'secret';
+mysql> flush privileges;
+```
+
+Start the dev container
+- connect to the network
+- specify the environment vars
+```sh
+docker run -dp 3000:3000 \
+  -w /app -v "$(pwd):/app" \
+  --network todo-app \
+  -e MYSQL_HOST=mysql \
+  -e MYSQL_USER=root \
+  -e MYSQL_PASSWORD=secret \
+  -e MYSQL_DB=todos \
+  node:12-alpine \
+  sh -c "yarn install && yarn run dev"
+```
+
+Check logs to see if app is connected to mySQL
+```sh
+docker logs <container-id>
+```
+
+Connect to MySQL db to see if items are written
+```sh
+docker exec -it <mysql-container-id> mysql -p todos
+```
+
+```sh
+mysql> select * from todo_items;
+```

@@ -282,7 +282,7 @@ docker-compose down --volumes
 
 Use `docker scan` to scan image for vulnerabilities
 
-View the layers of an image build from commands from the Dockerfile
+View the layers of an image built from commands from the Dockerfile
 ```sh
 docker image history <image-name>
 ```
